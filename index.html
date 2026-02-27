@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>미주 건축 탐방 일정표</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    
+    <!-- Babel (브라우저에서 JSX 변환) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        /* 모바일에서 탭할 때 하이라이트 깜빡임 제거 */
+        * { -webkit-tap-highlight-color: transparent; }
+        /* 스크롤바 숨기기 */
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useRef } = React;
+
+        // 아이콘 컴포넌트들 (Lucide 라이브러리 없이 직접 구현)
+        const MapPin = ({ size=24, className="" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+        );
+        const Bed = ({ size=24, className="" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/></svg>
+        );
+        const Plane = ({ size=24, className="" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.2-1.1.6L3 8l5 5-3.2 3.2c-.2.2-.3.5-.2.8L5 19l4-1 3.2-3.2 5 5c.3.1.6 0 .8-.2l1.2-1.2c.4-.2.7-.6.6-1.1Z"/></svg>
+        );
+        const Info = ({ size=24, className="" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+        );
+        const AlertCircle = ({ size=24, className="" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
+        );
+
+        // 일정 데이터 구조화 (이전과 동일)
+        const itineraryData = [
+            {
+                day: 1, date: '3월 3일(화)', region: '인천 ✈️ 라스베가스', hotel: '라스베가스',
+                details: [
+                { type: 'note', text: '★사전에 ESTA 신청이 되어 있어야 합니다.\nESTA 홈페이지는 다음과 같습니다.\n별도의 유사 사이트가 있으니, 아래의 사이트로 들어가셔서 등록하십시오.(등록한 후 보통 1~2시간 내에 나옵니다.)\nhttps://esta.cbp.dhs.gov/', color: 'text-blue-600' },
+                { time: '15:00', text: '인천 국제공항 2터미널 C열 미팅', type: 'event', icon: 'plane' },
+                { time: '18:00', text: '인천 국제공항 출국수속', type: 'event' },
+                { time: '21:00', text: '인천 국제공항 출발(KE 005)', type: 'event', color: 'text-red-500 font-semibold' },
+                { time: '15:10', text: '라스베가스 공항 도착', type: 'event', color: 'text-red-500 font-semibold' },
+                { time: '17:00', text: '가이드 미팅', type: 'event' },
+                { time: '17:15~18:30', text: '저녁식사', type: 'event' },
+                { time: '19:00', text: '호텔 체크인 후 휴식', type: 'event', icon: 'bed' },
+                { type: 'standard', text: '라스베가스 호텔' }
+                ]
+            },
+            {
+                day: 2, date: '3월 4일(수)', region: '라스베가스', hotel: '라스베가스',
+                details: [
+                { time: '09:00', text: '호텔 출발', type: 'event' },
+                { time: '09:30~10:20', text: '● Fontainebleau Las Vegas', type: 'event' },
+                { time: '10:25~11:15', text: '● Crockfords Las Vegas', type: 'event' },
+                { time: '11:15~11:25', text: '버스로 이동', type: 'event', isTransit: true },
+                { time: '11:25~11:45', text: '● Waldorf Astoria Las Vegas', type: 'event' },
+                { time: '11:45~12:00', text: '● Veer Towers( Murphy/Jahn)', type: 'event' },
+                { time: '12:00~12:40', text: '● ARIA Resort', type: 'event' },
+                { time: '12:40~12:50', text: '버스로 이동', type: 'event', isTransit: true },
+                { time: '12:50~14:00', text: '점심식사', type: 'event' },
+                { time: '14:00~17:00', text: '자유시간', type: 'event', color: 'text-red-500 font-semibold' },
+                { time: '17:00~18:30', text: '저녁시간', type: 'event', color: 'text-red-500 font-semibold' },
+                { time: '18:30', text: '○ Bellagio Resort (오쇼 공연장 호텔)저녁식사 마치고 벨라지오 리조트에서 미팅', type: 'event' },
+                { time: '19:00~20:30', text: '● O-Cirque du Soleil ("오쇼" 라고 불림)', type: 'event' },
+                { type: 'note', text: '※버스사용 법적 규정상 이 날은 호텔로 개별 귀환해야 합니다.\n라스베가스 안의 호텔들은 서로 거의 가까워서 문제 없을 것입니다.', color: 'text-green-600' }
+                ]
+            },
+            {
+                day: 3, date: '3월 5일(목)', region: '라스베가스', hotel: '라스베가스',
+                details: [
+                { time: '09:00', text: '호텔 출발', type: 'event' },
+                { time: '09:00~09:30', text: '버스로 이동', type: 'event', isTransit: true },
+                { time: '09:30~10:30', text: '● Wynn las vegas', type: 'event' },
+                { time: '10:30~10:40', text: '버스로 이동', type: 'event', isTransit: true },
+                { time: '10:40~11:30', text: '● Paris Las Vegas', type: 'event' },
+                { time: '11:35~12:30', text: '○ Caesars Palace', type: 'event' },
+                { time: '12:40~13:30', text: '점심식사', type: 'event' },
+                { time: '13:30~13:40', text: '버스로 이동', type: 'event', isTransit: true },
+                { time: '13:40~14:00', text: '좌석으로 입장', type: 'event' },
+                { time: '14:00~15:45', text: '● Sphere (공연 관람)', type: 'event' },
+                { time: '16:00~18:00', text: '자유시간', type: 'event', color: 'text-red-500 font-semibold' },
+                { time: '18:00~19:30', text: '저녁시간', type: 'event', color: 'text-red-500 font-semibold' }
+                ]
+            },
+            {
+                day: 4, date: '3월 6일(금)', region: '라스베가스 ✈️ 시카고', hotel: '시카고',
+                details: [
+                { time: '09:00~15:00', text: '자유시간', type: 'event', color: 'text-red-500 font-semibold' },
+                { time: '15:00~15:30', text: '공항으로 이동', type: 'event', isTransit: true },
+                { time: '15:30', text: '공항 도착 및 체크인', type: 'event' },
+                { time: '17:32', text: '라스베가스 공항 출발(AA2933)', type: 'event', color: 'text-red-500 font-semibold', icon: 'plane' },
+                { time: '23:12', text: '시카고 오헤어공항 도착', type: 'event', color: 'text-red-500 font-semibold' },
+                { time: '23:30', text: '버스 미팅', type: 'event' },
+                { time: '23:30~24:00', text: '버스로 호텔로 이동', type: 'event', isTransit: true },
+                { time: '24:00', text: '호텔 도착 및 체크인', type: 'event', icon: 'bed' }
+                ]
+            },
+            {
+                day: 5, date: '3월 7일(토)', region: '시카고', hotel: '시카고',
+                details: [
+                { type: 'note', text: '※어제는 호텔에 늦게 체크인을 하였으므로, 10:00에 호텔에서 출발하는 것이 좋을듯합니다.', color: 'text-green-600' },
+                { time: '10:00', text: '호텔출발', type: 'event' },
+                { time: '10:00~10:20', text: '버스로 이동', type: 'event', isTransit: true },
+                { time: '10:20~12:20', text: '● Millennium Park', type: 'event' },
+                { time: '12:20~12:40', text: '버스로 이동', type: 'event', isTransit: true },
+                { time: '12:40~13:40', text: '점심식사', type: 'event' },
+                { time: '13:40~14:00', text: '버스로 이동', type: 'event', isTransit: true },
+                { type: 'note', text: '[ ▼SOM ]', color: 'text-purple-700 font-bold text-lg' },
+                { time: '14:00~15:30', text: '● Willis Tower(Sears Tower)(SOM)', type: 'event', color: 'text-purple-700 font-medium' },
+                { time: '15:30~15:40', text: '버스로 이동', type: 'event', color: 'text-purple-700 font-medium', isTransit: true },
+                { time: '15:40~17:00', text: '● 800 Fulton Market (SOM)', type: 'event', color: 'text-purple-700 font-medium' },
+                { time: '17:00~17:10', text: '버스로 이동', type: 'event', isTransit: true },
+                { time: '17:10~17:40', text: '● The Aqua Tower(Studio Gang)', type: 'event' },
+                { time: '17:40~18:00', text: '차량으로 이동', type: 'event', isTransit: true },
+                { time: '18:00~19:00', text: '저녁식사', type: 'event' },
+                { time: '19:00~19:10', text: '버스로 호텔로 이동', type: 'event', isTransit: true },
+                { time: '19:10', text: '호텔 도착 및 휴식', type: 'event', icon: 'bed' }
+                ]
+            },
+            {
+                day: 6, date: '3월 8일(일)', region: '시카고 ✈️ 뉴욕', hotel: '뉴욕',
+                details: [
+                { time: '07:40', text: '호텔 출발', type: 'event' },
+                { time: '07:40~08:30', text: '버스로 공항으로 이동(트래픽 시간이므로 길이 막힐 수 있습니다.)', type: 'event', isTransit: true },
+                { time: '08:30', text: '공항 도착 및 체크인', type: 'event' },
+                { time: '10:45', text: '시카고 공항 출발(DL2917)', type: 'event', color: 'text-red-500 font-semibold', icon: 'plane' },
+                { time: '13:56', text: '뉴욕 라과디아 공항 도착', type: 'event', color: 'text-red-500 font-semibold' },
+                { time: '15:00~16:00', text: '버스로 이동', type: 'event', isTransit: true },
+                { time: '16:00~18:00', text: '호텔 체크인 및 휴식', type: 'event', color: 'text-red-500 font-semibold', icon: 'bed' },
+                { time: '18:00', text: '저녁식사', type: 'event' }
+                ]
+            },
+            {
+                day: 7, date: '3월 9일(월)', region: '뉴욕', hotel: '뉴욕',
+                details: [
+                { time: '09:00', text: '호텔 출발', type: 'event' },
+                { time: '09:00~09:30', text: '버스로 이동', type: 'event', isTransit: true },
+                { type: 'note', text: '[ ▼KPF ]', color: 'text-blue-700 font-bold text-lg' },
+                { time: '09:30~10:40', text: '● 10 & 30 Hudson Yards(KPF)', type: 'event', color: 'text-blue-700 font-medium' },
+                { time: '10:40~10:50', text: '도보로 이동', type: 'event', color: 'text-blue-700 font-medium', isTransit: true },
+                { time: '10:50~12:00', text: '● 55 Hudson Yards(KPF)', type: 'event', color: 'text-blue-700 font-medium' },
+                { time: '12:00~12:45', text: '점심식사', type: 'event', color: 'text-blue-700 font-medium' },
+                { time: '12:45~13:00', text: '이동', type: 'event', color: 'text-blue-700 font-medium', isTransit: true },
+                { type: 'note', text: '★ 아래 스케쥴은 픽스!!', color: 'text-red-600 font-bold text-lg' },
+                { time: '13:00~14:30', text: '● One Madison Avenue(KPF)※SL Green', type: 'event', color: 'text-red-600 font-medium' },
+                { time: '14:30~14:40', text: '버스로 이동', type: 'event', color: 'text-red-600 font-medium', isTransit: true },
+                { time: '14:40~16:00', text: '● One Vanderbilt(KPF)※SL Green', type: 'event', color: 'text-red-600 font-medium' },
+                { time: '16:00~16:10', text: '도보로 이동', type: 'event', color: 'text-red-600 font-medium', isTransit: true },
+                { time: '16:10~17:30', text: '● 270 Park Avenue(JP Morgan 사옥)\n※SL Green + JP Morgan', type: 'event', color: 'text-red-600 font-medium' },
+                { time: '17:30~19:00', text: '저녁식사 (SL Green)', type: 'event', color: 'text-red-600 font-medium' },
+                { time: '19:30', text: '호텔도착 및 휴식', type: 'event', color: 'text-red-600 font-medium', icon: 'bed' }
+                ]
+            },
+            {
+                day: 8, date: '3월 10일(화)', region: '뉴욕', hotel: '뉴욕',
+                details: [
+                { time: '09:40', text: '호텔출발', type: 'event' },
+                { time: '09:40~10:00', text: '버스로 이동', type: 'event', isTransit: true },
+                { type: 'note', text: '※BIG에게 아래 2개의 건축에 대하여 현장 설명을 부탁한 상태임. 아직 컨펌은 받지 못함>>단, BIG에서 준비하고 있는 것으로 판단됨. 2개의 메일 주소로 연락이 온 상태임, BIG 한국인 직원과 소통 중\nnycbiz@big.dk / stephen@big.dk', color: 'text-orange-600 text-sm' },
+                { type: 'note', text: '[ ▼BIG ]', color: 'text-orange-600 font-bold text-lg' },
+                { time: '10:00~11:10', text: '● VIA 57 West(625 W 57th St) (BIG)\n※BIG', type: 'event', color: 'text-orange-600 font-medium' },
+                { time: '11:10~11:20', text: '버스로 이동', type: 'event', color: 'text-orange-600 font-medium', isTransit: true },
+                { time: '11:20~13:00', text: '● The Spiral(BIG) (시간 픽스)\n※BIG 설명+ Tishman Speyer 어레인지 및 합류', type: 'event', color: 'text-orange-600 font-medium' },
+                { time: '12:40~13:40', text: '점심식사', type: 'event', color: 'text-orange-600 font-medium' },
+                { time: '14:00~14:15', text: '차로 이동', type: 'event', isTransit: true },
+                { type: 'note', text: '[ ▼SOM ]', color: 'text-purple-700 font-bold text-lg' },
+                { time: '14:15~16:20', text: '● Manhatan West(SOM)※SOM', type: 'event', color: 'text-purple-700 font-medium' },
+                { time: '16:20~16:40', text: '차로 이동', type: 'event', color: 'text-purple-700 font-medium', isTransit: true },
+                { time: '16:40~18:00', text: '● 7 World Trade Center(SOM)※SOM', type: 'event', color: 'text-purple-700 font-medium' },
+                { time: '18:00~19:20', text: '저녁식사', type: 'event' },
+                { time: '19:20~19:30', text: '차로 이동', type: 'event', isTransit: true },
+                { time: '19:30', text: '호텔 도착 및 휴식', type: 'event', icon: 'bed' }
+                ]
+            },
+            {
+                day: 9, date: '3월 11일(수)', region: '뉴욕', hotel: '기내',
+                details: [
+                { time: '10:00', text: '호텔 체크아웃', type: 'event' },
+                { time: '10:00~10:30', text: '차로 이동', type: 'event', isTransit: true },
+                { time: '10:30~11:40', text: '○ Little Island(Thomas Heatherwick)', type: 'event' },
+                { time: '11:40~11:50', text: '도보로 이동', type: 'event', isTransit: true },
+                { time: '11:50~12:00', text: '○ Lantern House(Thomas Heatherwick)', type: 'event' },
+                { time: '12:00~12:10', text: '도보로 이동', type: 'event', isTransit: true },
+                { time: '12:10~12:30', text: '○ 520 West 28th(ZAHA HADID)', type: 'event' },
+                { time: '12:40~13:40', text: '점심식사', type: 'event' },
+                { time: '13:40~16:30', text: '자유시간', type: 'event', color: 'text-red-500 font-semibold' },
+                { time: '18:30~19:30', text: '저녁식사', type: 'event', color: 'text-red-500 font-semibold' },
+                { time: '19:30~20:30', text: '차로 이동', type: 'event', isTransit: true },
+                { time: '20:30', text: '공항체크인', type: 'event', icon: 'plane' }
+                ]
+            },
+            {
+                day: 10, date: '3월 12일(목)', region: '기내', hotel: '기내',
+                details: [
+                { time: '00:50', text: '뉴욕 공항 출발(KE0086)', type: 'event', color: 'text-red-500 font-bold', icon: 'plane' }
+                ]
+            },
+            {
+                day: 11, date: '3월 13일(금)', region: '인천', hotel: '-',
+                details: [
+                { time: '05:30', text: '인천 국제 공항 도착', type: 'event', color: 'text-red-500 font-bold', icon: 'plane' }
+                ]
+            }
+        ];
+
+        function App() {
+            const [selectedDay, setSelectedDay] = useState(1);
+            const scrollContainerRef = useRef(null);
+            const [isDragging, setIsDragging] = useState(false);
+            const [startX, setStartX] = useState(0);
+            const [scrollLeft, setScrollLeft] = useState(0);
+            const [dragDistance, setDragDistance] = useState(0);
+
+            const activeData = itineraryData.find(d => d.day === selectedDay);
+
+            const handleMouseDown = (e) => {
+                setIsDragging(true);
+                setStartX(e.pageX - scrollContainerRef.current.offsetLeft);
+                setScrollLeft(scrollContainerRef.current.scrollLeft);
+                setDragDistance(0);
+            };
+
+            const handleMouseLeave = () => setIsDragging(false);
+            const handleMouseUp = () => setIsDragging(false);
+
+            const handleMouseMove = (e) => {
+                if (!isDragging) return;
+                e.preventDefault();
+                const x = e.pageX - scrollContainerRef.current.offsetLeft;
+                const walk = (x - startX) * 2;
+                scrollContainerRef.current.scrollLeft = scrollLeft - walk;
+                setDragDistance(Math.abs(walk));
+            };
+
+            const handleTabClick = (day) => {
+                if (dragDistance > 10) {
+                    setDragDistance(0);
+                    return;
+                }
+                setSelectedDay(day);
+            };
+
+            return (
+                <div className="min-h-screen bg-gray-100 font-sans sm:py-8">
+                <div className="max-w-md mx-auto bg-gray-100 min-h-screen sm:rounded-3xl sm:shadow-2xl sm:overflow-hidden relative flex flex-col">
+                    
+                    {/* 헤더 */}
+                    <header className="bg-white px-5 pt-12 pb-5 z-20">
+                    <div className="flex items-center justify-between mb-2">
+                        <h1 className="text-2xl font-black text-gray-900 tracking-tight">미주 건축 탐방</h1>
+                        <span className="bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded-md font-bold">일정표</span>
+                    </div>
+                    <p className="text-gray-500 font-medium text-sm flex items-center gap-1.5">
+                        <MapPin size={14} className="text-blue-500" />
+                        라스베가스 - 시카고 - 뉴욕
+                    </p>
+                    </header>
+
+                    {/* 상단 일자 선택 탭 */}
+                    <div className="bg-white border-b border-gray-100 sticky top-0 z-30 shadow-sm">
+                    <div 
+                        ref={scrollContainerRef}
+                        onMouseDown={handleMouseDown}
+                        onMouseLeave={handleMouseLeave}
+                        onMouseUp={handleMouseUp}
+                        onMouseMove={handleMouseMove}
+                        className={`flex overflow-x-auto py-3 px-4 gap-2 hide-scrollbar select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab scroll-smooth'}`}
+                    >
+                        {itineraryData.map(data => (
+                        <button
+                            key={data.day}
+                            onClick={() => handleTabClick(data.day)}
+                            className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-bold transition-all duration-200 ${
+                            selectedDay === data.day
+                                ? 'bg-blue-600 text-white shadow-md transform scale-105'
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            }`}
+                        >
+                            {data.day}일차
+                        </button>
+                        ))}
+                    </div>
+                    </div>
+
+                    {/* 메인 컨텐츠 */}
+                    <main className="flex-1 overflow-y-auto p-4 pb-24 space-y-4">
+                    
+                    {selectedDay === 1 && (
+                        <div className="bg-blue-600 rounded-2xl p-4 shadow-md text-white mb-2">
+                        <div className="flex items-start gap-3">
+                            <AlertCircle className="text-blue-200 flex-shrink-0 mt-0.5" size={20} />
+                            <div>
+                            <h3 className="font-bold mb-1">출국 전 필수 확인사항</h3>
+                            <p className="text-blue-100 text-sm leading-relaxed">
+                                사전에 ESTA 신청이 반드시 되어 있어야 합니다. 대행 사이트가 아닌 공식 웹사이트(<a href="https://esta.cbp.dhs.gov/" target="_blank" rel="noreferrer" className="underline font-medium text-white">esta.cbp.dhs.gov</a>)를 이용해주세요.
+                            </p>
+                            </div>
+                        </div>
+                        </div>
+                    )}
+
+                    {/* 해당 일자 상세 카드 */}
+                    <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+                        
+                        <div className="p-5 border-b border-gray-100 bg-gray-50/50">
+                        <div className="flex items-center gap-2 mb-4">
+                            <span className="bg-blue-100 text-blue-700 text-xs font-bold px-2.5 py-1 rounded-md">
+                            제{activeData.day}일
+                            </span>
+                            <h2 className="text-xl font-bold text-gray-900">{activeData.date}</h2>
+                        </div>
+                        <div className="flex flex-col gap-2.5 text-sm text-gray-600 font-medium">
+                            <span className="flex items-center gap-3">
+                            <div className="w-7 h-7 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0">
+                                <MapPin size={14} className="text-blue-500" />
+                            </div>
+                            {activeData.region}
+                            </span>
+                            {activeData.hotel !== '-' && (
+                            <span className="flex items-center gap-3">
+                                <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                                <Bed size={14} className="text-gray-500" />
+                                </div>
+                                숙박: {activeData.hotel}
+                            </span>
+                            )}
+                        </div>
+                        </div>
+
+                        {/* 타임라인 내용 */}
+                        <div className="px-5 pb-8 pt-6">
+                        <div className="flex flex-col gap-0 relative">
+                            {/* 타임라인 연결선 */}
+                            <div className="absolute left-[23px] top-4 bottom-4 w-px bg-gray-200"></div>
+
+                            {activeData.details.map((detail, index) => (
+                                <div key={index} className="flex gap-4 py-3.5 relative z-10 group">
+                                {/* 왼쪽 시간 영역 */}
+                                <div className="w-14 flex-shrink-0 flex flex-col items-end pt-0.5">
+                                    {detail.time ? (
+                                    <span className={`text-sm font-bold ${detail.color ? detail.color : 'text-slate-700'} text-right leading-tight`}>
+                                        {detail.time.split('~').map((t, i, arr) => (
+                                        <React.Fragment key={i}>
+                                            {t}
+                                            {i < arr.length - 1 && <br/>}
+                                            {i < arr.length - 1 && <span className="text-gray-400 text-xs font-normal">~</span>}
+                                            {i < arr.length - 1 && <br/>}
+                                        </React.Fragment>
+                                        ))}
+                                    </span>
+                                    ) : (
+                                    <div className="w-full flex justify-end pr-1 mt-1">
+                                        {detail.type === 'note' && <Info size={16} className="text-gray-400" />}
+                                    </div>
+                                    )}
+                                </div>
+
+                                {/* 타임라인 점 */}
+                                <div className="relative flex items-start justify-center pt-1.5 w-4">
+                                    <div className={`w-2.5 h-2.5 rounded-full z-10 transition-transform duration-300
+                                    ${detail.isTransit ? 'bg-gray-300' : 
+                                        detail.type === 'note' ? 'bg-transparent' : 'bg-blue-500 ring-4 ring-white group-hover:scale-125'}`} 
+                                    />
+                                </div>
+
+                                {/* 오른쪽 내용 영역 */}
+                                <div className="flex-1 pb-1 pt-0.5">
+                                    {detail.type === 'note' ? (
+                                    <div className={`p-3.5 rounded-xl whitespace-pre-line text-sm leading-relaxed ${
+                                        detail.color && detail.color.includes('purple') ? 'bg-purple-50' : 
+                                        detail.color && detail.color.includes('orange') ? 'bg-orange-50' : 
+                                        detail.color && detail.color.includes('red') ? 'bg-red-50' : 
+                                        'bg-blue-50'
+                                    } ${detail.color || 'text-gray-700'}`}>
+                                        {detail.text}
+                                    </div>
+                                    ) : (
+                                    <div className="flex flex-col items-start">
+                                        <span className={`text-base whitespace-pre-line leading-snug
+                                        ${detail.isTransit ? 'text-gray-500 text-sm' : 'text-gray-800'} 
+                                        ${detail.color ? detail.color : ''}`}>
+                                        {detail.text}
+                                        </span>
+                                        
+                                        {/* 특수 아이콘 표시 */}
+                                        <div className="flex items-center gap-2">
+                                        {detail.icon === 'plane' && <Plane size={16} className="mt-1.5 text-blue-500 transform rotate-45" />}
+                                        {detail.icon === 'bed' && <Bed size={16} className="mt-1.5 text-gray-500" />}
+                                        </div>
+
+                                    </div>
+                                    )}
+                                </div>
+                                </div>
+                            ))}
+                        </div>
+                        </div>
+                        
+                    </div>
+                    </main>
+                    
+                </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
